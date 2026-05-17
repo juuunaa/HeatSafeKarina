@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>Monitoring Suhu Tubuh</title>
+
+  <!-- FIREBASE -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <!-- CHART -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:Arial, sans-serif;
+    }
+
+    body{
+
+      background:
+      linear-gradient(135deg,#0f172a,#1e293b);
+
+      min-height:100vh;
+
+      display:flex;
+      justify-content:center;
+      align-items:center;
+
+      padding:20px;
+    }
+
+    /* =========================
+       PHONE MOCKUP
+    ========================= */
+
+    .phone{
+
+      width:360px;
+      min-height:720px;
+
+      background:#111827;
+
+      border-radius:40px;
+
+      padding:20px;
+
+      border:10px solid #1f2937;
+
+      box-shadow:
+      0 0 40px rgba(0,0,0,0.5);
+
+      position:relative;
+
+      overflow:hidden;
+    }
+
+    .notch{
+
+      width:120px;
+      height:24px;
+
+      background:#000;
+
+      border-radius:0 0 20px 20px;
+
+      position:absolute;
+
+      top:0;
+      left:50%;
+
+      transform:translateX(-50%);
+    }
+
+    /* =========================
+       HEADER
+    ========================= */
+
+    .header{
+
+      margin-top:30px;
+
+      background:
+      linear-gradient(90deg,#22c55e,#16a34a);
+
+      border-radius:20px;
+
+      padding:18px;
+
+      text-align:center;
+
+      color:white;
+
+      font-size:22px;
+
+      font-weight:bold;
+
+      letter-spacing:1px;
+
+      box-shadow:
+      0 5px 20px rgba(34,197,94,0.3);
+    }
+
+    /* =========================
+       CARD
+    ========================= */
+
+    .card{
+
+      background:#1f2937;
+
+      border-radius:20px;
+
+      padding:20px;
+
+      margin-top:20px;
+
+      box-shadow:
+      0 5px 20px rgba(0,0,0,0.3);
+    }
+
+    .title{
+
+      color:#9ca3af;
+
+      font-size:14px;
+
+      margin-bottom:10px;
+
+      letter-spacing:1px;
+    }
+
+    /* =========================
+       TEMPERATURE
+    ========================= */
+
+    .temperature{
+
+      font-size:56px;
+
+      color:#22c55e;
+
+      font-weight:bold;
+
+      text-align:center;
+
+      margin-top:10px;
+
+      transition:0.3s;
+    }
+
+    /* =========================
+       STATUS
+    ========================= */
+
+    .status{
+
+      text-align:center;
+
+      font-size:28px;
+
+      font-weight:bold;
+
+      margin-top:10px;
+
+      transition:0.3s;
+    }
+
+    .message{
+
+      color:#d1d5db;
+
+      text-align:center;
+
+      margin-top:15px;
+
+      line-height:1.5;
+
+      font-size:16px;
+    }
+
+    /* =========================
+       GRAPH
+    ========================= */
+
+    .graph{
+
+      margin-top:20px;
+
+      height:220px;
+
+      border-radius:15px;
+
+      background:#0f172a;
+
+      border:1px solid #374151;
+
+      padding:10px;
+    }
+
+    /* =========================
+       FOOTER
+    ========================= */
+
+    .footer{
+
+      margin-top:20px;
+
+      text-align:center;
+
+      color:#6b7280;
+
+      font-size:12px;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="phone">
+
+    <div class="notch"></div>
+
+    <!-- HEADER -->
+
+    <div class="header">
+      MONITORING SUHU TUBUH
+    </div>
+
+    <!-- SUHU -->
+
+    <div class="card">
+
+      <div class="title">
+        SUHU TUBUH
+      </div>
+
+      <div class="temperature" id="suhu">
+        0.0°C
+      </div>
+
+    </div>
+
+    <!-- GRAPH -->
+
+    <div class="card graph">
+
+      <canvas id="tempChart"></canvas>
+
+    </div>
+
+    <!-- STATUS -->
+
+    <div class="card">
+
+      <div class="title">
+        STATUS KONDISI
+      </div>
+
+      <div class="status" id="status">
+        MENUNGGU DATA
+      </div>
+
+      <div class="message" id="pesan">
+
+        Sistem monitoring sedang berjalan.
+
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+
+    <div class="footer">
+
+      ESP32 • Firebase Realtime Database
+
+    </div>
+
+  </div>
+
+  <script>
+
+    // =========================
+    // FIREBASE CONFIG
+    // =========================
+
+    const firebaseConfig = {
+
+      apiKey:
+      "AIzaSyAVDhgY3TeXTIgLgwhh4LxWspb02dywQi8",
+
+      authDomain:
+      "tugas-akhir-d197d.firebaseapp.com",
+
+      databaseURL:
+      "https://tugas-akhir-d197d-default-rtdb.asia-southeast1.firebasedatabase.app",
+
+      projectId:
+      "tugas-akhir-d197d",
+
+      storageBucket:
+      "tugas-akhir-d197d.firebasestorage.app",
+
+      messagingSenderId:
+      "562786924778",
+
+      appId:
+      "1:562786924778:web:84d8da02c227ea17e83f93",
+
+      measurementId:
+      "G-SX76XCQ3QS"
+    };
+
+    // =========================
+    // FIREBASE INIT
+    // =========================
+
+    firebase.initializeApp(firebaseConfig);
+
+    const database = firebase.database();
+
+    console.log("Firebase Connected");
+
+    // =========================
+    // NOTIFICATION
+    // =========================
+
+    if(Notification.permission !== "granted"){
+
+      Notification.requestPermission();
+    }
+
+    let bahayaAktif = false;
+
+    // =========================
+    // CHART CONFIG
+    // =========================
+
+    const ctx =
+    document.getElementById("tempChart")
+    .getContext("2d");
+
+    const labels = [];
+    const tempData = [];
+
+    const tempChart = new Chart(ctx, {
+
+      type: "line",
+
+      data: {
+
+        labels: labels,
+
+        datasets: [{
+
+          label: "Suhu Tubuh",
+
+          data: tempData,
+
+          borderColor: "#22c55e",
+
+          backgroundColor:
+          "rgba(34,197,94,0.2)",
+
+          borderWidth: 3,
+
+          tension: 0.4,
+
+          fill: true
+        }]
+      },
+
+      options: {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+        plugins: {
+
+          legend: {
+
+            display: false
+          }
+        },
+
+        scales: {
+
+          x: {
+
+            ticks: {
+
+              color:"#9ca3af"
+            },
+
+            grid: {
+
+              color:"rgba(255,255,255,0.05)"
+            }
+          },
+
+          y: {
+
+            min:30,
+            max:45,
+
+            ticks: {
+
+              color:"#9ca3af"
+            },
+
+            grid: {
+
+              color:"rgba(255,255,255,0.05)"
+            }
+          }
+        }
+      }
+    });
+
+    // =========================
+    // REALTIME DATA
+    // =========================
+
+    database.ref("/monitoring")
+    .on("value", (snapshot) => {
+
+      const data = snapshot.val();
+
+      console.log(data);
+
+      if(data){
+
+        // =========================
+        // DATA
+        // =========================
+
+        const suhu =
+        parseFloat(data.suhu).toFixed(1);
+
+        const kondisi =
+        data.kondisi;
+
+        // =========================
+        // ELEMENT
+        // =========================
+
+        const suhuElement =
+        document.getElementById("suhu");
+
+        const statusElement =
+        document.getElementById("status");
+
+        const pesanElement =
+        document.getElementById("pesan");
+
+        // =========================
+        // UPDATE TEXT
+        // =========================
+
+        suhuElement.innerHTML =
+        suhu + "°C";
+
+        statusElement.innerHTML =
+        kondisi;
+
+        // =========================
+        // UPDATE CHART
+        // =========================
+
+        const currentTime =
+        new Date().toLocaleTimeString();
+
+        labels.push(currentTime);
+
+        tempData.push(suhu);
+
+        // Maksimal 10 data
+
+        if(labels.length > 10){
+
+          labels.shift();
+          tempData.shift();
+        }
+
+        tempChart.update();
+
+        // =========================
+        // MODE AMAN
+        // =========================
+
+        if(kondisi === "AMAN"){
+
+          suhuElement.style.color =
+          "#22c55e";
+
+          statusElement.style.color =
+          "#22c55e";
+
+          pesanElement.innerHTML =
+          "Suhu tubuh dalam kondisi normal.";
+
+          bahayaAktif = false;
+        }
+
+        // =========================
+        // MODE WASPADA
+        // =========================
+
+        else if(kondisi === "WASPADA"){
+
+          suhuElement.style.color =
+          "#facc15";
+
+          statusElement.style.color =
+          "#facc15";
+
+          pesanElement.innerHTML =
+          "Kurangi aktivitas dan perbanyak istirahat.";
+
+          bahayaAktif = false;
+        }
+
+        // =========================
+        // MODE BAHAYA
+        // =========================
+
+        else{
+
+          suhuElement.style.color =
+          "#ef4444";
+
+          statusElement.style.color =
+          "#ef4444";
+
+          pesanElement.innerHTML =
+          "Mendekati heatstroke! Cari tempat teduh dan minum air.";
+
+          // NOTIFIKASI SEKALI
+
+          if(!bahayaAktif){
+
+            bahayaAktif = true;
+
+            // Browser Notification
+
+            if(Notification.permission === "granted"){
+
+              new Notification(
+                "PERINGATAN HEATSTROKE", {
+
+                body:
+                "Suhu tubuh mencapai kondisi bahaya!",
+
+                icon:
+                "https://cdn-icons-png.flaticon.com/512/564/564619.png"
+              });
+            }
+
+            // Popup Alert
+
+            alert(
+              "PERINGATAN!\n\nSuhu tubuh berada pada kondisi BAHAYA!");
+          }
+        }
+      }
+    });
+
+  </script>
+
+</body>
+</html>
